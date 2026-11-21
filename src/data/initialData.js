@@ -347,5 +347,37 @@ export const INITIAL_DATA = {
       expectedReturnDate: "2026-11-23",
       status: "At Vendor"
     }
+  ],
+
+  // Immutable Audit Logs (Event Sourcing)
+  auditLogs: [
+    {
+      timestamp: "2026-11-21 09:30:15",
+      action: "IGR_RECEIVE",
+      entity: "IGR-2026-0491",
+      role: "Weighbridge Clerk",
+      details: "Scale weighment: 880.00 KG (38 rolls) received from Oswal Woollen Mills"
+    },
+    {
+      timestamp: "2026-11-21 11:15:22",
+      action: "BATCH_SCHEDULE",
+      entity: "JC-2026-0041",
+      role: "Dyeing Master",
+      details: "Loaded 450.00 KG on Soft Flow SF-01. Bath ratio 1:6 (2700 L)"
+    },
+    {
+      timestamp: "2026-11-21 14:02:45",
+      action: "GATE_PASS_ISSUE",
+      entity: "OGC-RGP-2026-0104",
+      role: "Floor Supervisor",
+      details: "Issued Returnable Gate Pass for Fleece Wire Raising (620 KG)"
+    },
+    {
+      timestamp: "2026-11-21 16:45:10",
+      action: "DISPATCH_GENERATE",
+      entity: "DSP-2026-0310",
+      role: "Billing Accountant",
+      details: "Delivery challan 498.50 KG (Shrinkage 4.13%) generated for Monte Carlo"
+    }
   ]
 };

@@ -13,7 +13,7 @@ import {
   Truck
 } from 'lucide-react';
 
-export default function Dashboard({ data, setActiveTab }) {
+export default function Dashboard({ data, setActiveTab, onOpenTelemetry, onOpenQr }) {
   // Aggregate stats
   const totalInwardKg = data.igrs?.reduce((sum, igr) => sum + (parseFloat(igr.totalQty) || 0), 0) || 0;
   const totalInwardRolls = data.igrs?.reduce((sum, igr) => sum + (parseInt(igr.totalRolls) || 0), 0) || 0;
@@ -156,14 +156,19 @@ export default function Dashboard({ data, setActiveTab }) {
             return (
               <div 
                 key={m.id}
-                className={`p-3.5 rounded-xl border transition-all ${
+                onClick={onOpenTelemetry}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer hover:border-cyan-400 group ${
                   isBusy 
                     ? 'bg-slate-950/70 border-cyan-500/30 shadow-sm shadow-cyan-500/5' 
                     : 'bg-slate-950/40 border-slate-800'
                 }`}
+                title="Click to view live SCADA telemetry & temperature curve"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white tracking-wide">{m.code}</span>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="text-xs font-bold text-white tracking-wide group-hover:text-cyan-400 transition-colors">{m.code}</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                  </div>
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                     m.status === 'Dyeing' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' :
                     m.status === 'Washing' ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30' :
@@ -182,7 +187,7 @@ export default function Dashboard({ data, setActiveTab }) {
                 </div>
 
                 {m.currentBatch && (
-                  <div className="mt-2 text-[10px] bg-slate-900/90 text-cyan-300 px-2 py-1 rounded border border-slate-800 flex justify-between">
+                  <div className="mt-2 text-[10px] bg-slate-900/90 text-cyan-300 px-2 py-1 rounded border border-slate-800 flex justify-between items-center">
                     <span>Batch:</span>
                     <span className="font-mono font-semibold">{m.currentBatch}</span>
                   </div>

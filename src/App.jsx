@@ -9,6 +9,10 @@ import DispatchModule from './components/DispatchModule';
 import BillingModule from './components/BillingModule';
 import MastersModule from './components/MastersModule';
 import SettingsModule from './components/SettingsModule';
+import CommandPalette from './components/CommandPalette';
+import VesselTelemetryModal from './components/VesselTelemetryModal';
+import RollQrModal from './components/RollQrModal';
+import AuditTrailModal from './components/AuditTrailModal';
 import { loadERPData, saveERPData, getSupabaseConfig } from './services/storage';
 import { INITIAL_DATA } from './data/initialData';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
@@ -19,6 +23,25 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [toast, setToast] = useState(null);
   const [cloudSynced, setCloudSynced] = useState(false);
+
+  // Tech-Giant Grade Modals and RBAC States
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isTelemetryOpen, setIsTelemetryOpen] = useState(false);
+  const [isQrOpen, setIsQrOpen] = useState(false);
+  const [isAuditOpen, setIsAuditOpen] = useState(false);
+  const [currentRole, setCurrentRole] = useState('gm'); // 'gm' | 'master' | 'operator' | 'accountant'
+
+  // Global Ctrl+K / Cmd+K Command Palette Shortcut
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   useEffect(() => {
     // Attempt automatic initial sync from Supabase
@@ -47,38 +70,82 @@ export default function App() {
     saveERPData(newData);
   };
 
+  // Event Sourcing: Append audit event log
+  const logAuditEvent = (action, entity, details) => {
+    const roleNames = {
+      gm: 'Mill Owner / GM',
+      master: 'Dyeing Master',
+      operator: 'Weighbridge Clerk',
+      accountant: 'Billing Accountant'
+    };
+    const now = new Date();
+    const timestamp = `${now.toISOString().split('T')[0]} ${now.toTimeString().split(' ')[0]}`;
+    const newLog = {
+      timestamp,
+      action,
+      entity,
+      role: roleNames[currentRole] || 'System Operator',
+      details
+    };
+    return [newLog, ...(data.auditLogs || [])];
+  };
+
   // Handlers for modules
   const handleSaveIGR = (newIGR) => {
+    const updatedLogs = logAuditEvent(
+      'IGR_RECEIVE',
+      newIGR.igrNo,
+      `Received ${newIGR.totalQty} KG (${newIGR.totalRolls} rolls) from ${newIGR.partyName}`
+    );
     const updated = {
       ...data,
-      igrs: [newIGR, ...(data.igrs || [])]
+      igrs: [newIGR, ...(data.igrs || [])],
+      auditLogs: updatedLogs
     };
     handleUpdateData(updated);
     showToast(`Inward receipt ${newIGR.igrNo} posted to Floor WIP!`);
   };
 
   const handleSaveJobCard = (newJC) => {
+    const updatedLogs = logAuditEvent(
+      'BATCH_SCHEDULE',
+      newJC.jcNo,
+      `Scheduled on ${newJC.machineCode} for shade ${newJC.shadeName} (${newJC.totalWeightKg} KG)`
+    );
     const updated = {
       ...data,
-      jobCards: [newJC, ...(data.jobCards || [])]
+      jobCards: [newJC, ...(data.jobCards || [])],
+      auditLogs: updatedLogs
     };
     handleUpdateData(updated);
     showToast(`Job Card ${newJC.jcNo} scheduled on vessel ${newJC.machineCode}!`);
   };
 
   const handleSaveDispatch = (newDisp) => {
+    const updatedLogs = logAuditEvent(
+      'DISPATCH_GENERATE',
+      newDisp.dispNo,
+      `Delivered ${newDisp.dispatchedWeightKg} KG (${newDisp.dispatchedRolls} rolls) with ${newDisp.processLossPercent}% shrinkage to ${newDisp.partyName}`
+    );
     const updated = {
       ...data,
-      dispatches: [newDisp, ...(data.dispatches || [])]
+      dispatches: [newDisp, ...(data.dispatches || [])],
+      auditLogs: updatedLogs
     };
     handleUpdateData(updated);
     showToast(`Dispatch challan ${newDisp.dispNo} created with ${newDisp.processLossPercent}% shrinkage!`);
   };
 
   const handleSaveGatePass = (newGP) => {
+    const updatedLogs = logAuditEvent(
+      'GATE_PASS_ISSUE',
+      newGP.ogcNo,
+      `Outward pass (${newGP.type}) issued to ${newGP.partyName} for ${newGP.purpose}`
+    );
     const updated = {
       ...data,
-      gatePasses: [newGP, ...(data.gatePasses || [])]
+      gatePasses: [newGP, ...(data.gatePasses || [])],
+      auditLogs: updatedLogs
     };
     handleUpdateData(updated);
     showToast(`Outward gate pass ${newGP.ogcNo} issued for ${newGP.partyName}!`);
@@ -95,7 +162,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       
-      {/* Top Navigation */}
+      {/* Top Navigation with Tech-Giant Command Palette, SCADA Telemetry, QR, Audit triggers */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -103,6 +170,12 @@ export default function App() {
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         isCloudConnected={isCloudConnected}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        onOpenQr={() => setIsQrOpen(true)}
+        onOpenTelemetry={() => setIsTelemetryOpen(true)}
+        onOpenAudit={() => setIsAuditOpen(true)}
+        currentRole={currentRole}
+        setCurrentRole={setCurrentRole}
       />
 
       {/* Main Container */}
@@ -117,7 +190,14 @@ export default function App() {
         )}
 
         {/* Tab Routers */}
-        {activeTab === 'dashboard' && <Dashboard data={data} setActiveTab={setActiveTab} />}
+        {activeTab === 'dashboard' && (
+          <Dashboard 
+            data={data} 
+            setActiveTab={setActiveTab} 
+            onOpenTelemetry={() => setIsTelemetryOpen(true)}
+            onOpenQr={() => setIsQrOpen(true)}
+          />
+        )}
         {activeTab === 'inward' && <GreyInward data={data} onSaveIGR={handleSaveIGR} />}
         {activeTab === 'jobcards' && <JobCardBatching data={data} onSaveJobCard={handleSaveJobCard} />}
         {activeTab === 'recipes' && <RecipeEngine data={data} />}
@@ -134,6 +214,35 @@ export default function App() {
         )}
 
       </main>
+
+      {/* Enterprise Tech-Giant Modals */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        data={data}
+        setActiveTab={setActiveTab}
+        onOpenQr={() => setIsQrOpen(true)}
+        onOpenTelemetry={() => setIsTelemetryOpen(true)}
+        onOpenAudit={() => setIsAuditOpen(true)}
+      />
+
+      <VesselTelemetryModal
+        isOpen={isTelemetryOpen}
+        onClose={() => setIsTelemetryOpen(false)}
+        machines={data.machines || []}
+      />
+
+      <RollQrModal
+        isOpen={isQrOpen}
+        onClose={() => setIsQrOpen(false)}
+        data={data}
+      />
+
+      <AuditTrailModal
+        isOpen={isAuditOpen}
+        onClose={() => setIsAuditOpen(false)}
+        auditLogs={data.auditLogs || []}
+      />
 
       {/* Footer */}
       <footer className="bg-slate-900/50 border-t border-slate-900 py-4 text-center text-xs text-slate-500">
