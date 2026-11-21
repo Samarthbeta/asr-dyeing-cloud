@@ -4,8 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 const STORAGE_KEY = 'ASR_DYEING_ERP_V1';
 const SUPABASE_CONFIG_KEY = 'ASR_SUPABASE_CONFIG';
 
-const DEFAULT_SUPABASE_URL = "https://ocbzbysqtenqwfljyiyz.supabase.co";
-const DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9jYnpieXNxdGVucXdmbGp5aXl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyMjYzNTAsImV4cCI6MjExMDgwMjM1MH0.xteCkR8nI56h1Tt3GtgDWK2jORzUWA0m4IbgpD_nWmw";
+const ENV_SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const ENV_SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export function getSupabaseConfig() {
   try {
@@ -15,15 +15,15 @@ export function getSupabaseConfig() {
       if (cfg.url && cfg.anonKey) return cfg;
     }
     return {
-      url: DEFAULT_SUPABASE_URL,
-      anonKey: DEFAULT_SUPABASE_KEY,
-      autoSync: true
+      url: ENV_SUPABASE_URL,
+      anonKey: ENV_SUPABASE_KEY,
+      autoSync: Boolean(ENV_SUPABASE_URL && ENV_SUPABASE_KEY)
     };
   } catch (e) {
     return {
-      url: DEFAULT_SUPABASE_URL,
-      anonKey: DEFAULT_SUPABASE_KEY,
-      autoSync: true
+      url: ENV_SUPABASE_URL,
+      anonKey: ENV_SUPABASE_KEY,
+      autoSync: Boolean(ENV_SUPABASE_URL && ENV_SUPABASE_KEY)
     };
   }
 }
@@ -74,8 +74,10 @@ export function saveERPData(data) {
 
 export async function testSupabaseConnection(url, anonKey) {
   try {
-    if (!url || !anonKey) throw new Error("URL and Anon Key are required");
-    const supabase = createClient(url, anonKey);
+    const targetUrl = url || ENV_SUPABASE_URL;
+    const targetKey = anonKey || ENV_SUPABASE_KEY;
+    if (!targetUrl || !targetKey) throw new Error("Supabase URL and Anon Key are required");
+    const supabase = createClient(targetUrl, targetKey);
     const { data, error } = await supabase.from('asr_erp_state').select('id').limit(1);
     if (error) throw error;
     return { success: true, message: "Connected to Supabase PostgreSQL successfully!" };
@@ -85,7 +87,11 @@ export async function testSupabaseConnection(url, anonKey) {
 }
 
 export async function pushToSupabase(data, url, anonKey) {
-  const supabase = createClient(url || DEFAULT_SUPABASE_URL, anonKey || DEFAULT_SUPABASE_KEY);
+  const targetUrl = url || ENV_SUPABASE_URL;
+  const targetKey = anonKey || ENV_SUPABASE_KEY;
+  if (!targetUrl || !targetKey) return { success: false, error: "No Supabase credentials configured" };
+
+  const supabase = createClient(targetUrl, targetKey);
   const payload = {
     id: 'primary_mill_snapshot',
     state: data,
@@ -101,7 +107,11 @@ export async function pushToSupabase(data, url, anonKey) {
 }
 
 export async function pullFromSupabase(url, anonKey) {
-  const supabase = createClient(url || DEFAULT_SUPABASE_URL, anonKey || DEFAULT_SUPABASE_KEY);
+  const targetUrl = url || ENV_SUPABASE_URL;
+  const targetKey = anonKey || ENV_SUPABASE_KEY;
+  if (!targetUrl || !targetKey) throw new Error("No Supabase credentials configured");
+
+  const supabase = createClient(targetUrl, targetKey);
   const { data, error } = await supabase
     .from('asr_erp_state')
     .select('state')

@@ -11,6 +11,6 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_SUPABASE_URL
-        value: https://ocbzbysqtenqwfljyiyz.supabase.co
+        sync: false
       - key: VITE_SUPABASE_ANON_KEY
-        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9jYnpieXNxdGVucXdmbGp5aXl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyMjYzNTAsImV4cCI6MjExMDgwMjM1MH0.xteCkR8nI56h1Tt3GtgDWK2jORzUWA0m4IbgpD_nWmw
+        sync: false
