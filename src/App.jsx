@@ -18,6 +18,24 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [toast, setToast] = useState(null);
+  const [cloudSynced, setCloudSynced] = useState(false);
+
+  useEffect(() => {
+    // Attempt automatic initial sync from Supabase
+    const cfg = getSupabaseConfig();
+    if (cfg.url && cfg.anonKey) {
+      import('./services/storage').then(({ pullFromSupabase }) => {
+        pullFromSupabase(cfg.url, cfg.anonKey)
+          .then((remoteData) => {
+            if (remoteData) {
+              setData(remoteData);
+              setCloudSynced(true);
+            }
+          })
+          .catch((e) => console.warn("Supabase initial fetch bypassed:", e));
+      });
+    }
+  }, []);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });

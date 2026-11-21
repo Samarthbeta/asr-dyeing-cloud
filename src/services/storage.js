@@ -4,12 +4,27 @@ import { createClient } from '@supabase/supabase-js';
 const STORAGE_KEY = 'ASR_DYEING_ERP_V1';
 const SUPABASE_CONFIG_KEY = 'ASR_SUPABASE_CONFIG';
 
+const DEFAULT_SUPABASE_URL = "https://ocbzbysqtenqwfljyiyz.supabase.co";
+const DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9jYnpieXNxdGVucXdmbGp5aXl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyMjYzNTAsImV4cCI6MjExMDgwMjM1MH0.xteCkR8nI56h1Tt3GtgDWK2jORzUWA0m4IbgpD_nWmw";
+
 export function getSupabaseConfig() {
   try {
     const raw = localStorage.getItem(SUPABASE_CONFIG_KEY);
-    return raw ? JSON.parse(raw) : { url: '', anonKey: '', autoSync: false };
+    if (raw) {
+      const cfg = JSON.parse(raw);
+      if (cfg.url && cfg.anonKey) return cfg;
+    }
+    return {
+      url: DEFAULT_SUPABASE_URL,
+      anonKey: DEFAULT_SUPABASE_KEY,
+      autoSync: true
+    };
   } catch (e) {
-    return { url: '', anonKey: '', autoSync: false };
+    return {
+      url: DEFAULT_SUPABASE_URL,
+      anonKey: DEFAULT_SUPABASE_KEY,
+      autoSync: true
+    };
   }
 }
 
@@ -25,7 +40,6 @@ export function loadERPData() {
       return INITIAL_DATA;
     }
     const parsed = JSON.parse(saved);
-    // Guarantee required top-level arrays exist
     return {
       company: parsed.company || INITIAL_DATA.company,
       parties: parsed.parties || INITIAL_DATA.parties,
@@ -39,7 +53,7 @@ export function loadERPData() {
       gatePasses: parsed.gatePasses || INITIAL_DATA.gatePasses
     };
   } catch (err) {
-    console.error("Failed to load ERP local state:", err);
+    console.error("Failed to load local state:", err);
     return INITIAL_DATA;
   }
 }
@@ -47,15 +61,14 @@ export function loadERPData() {
 export function saveERPData(data) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    // If Supabase autoSync is enabled, trigger background sync
     const config = getSupabaseConfig();
     if (config.autoSync && config.url && config.anonKey) {
       pushToSupabase(data, config.url, config.anonKey).catch(e => {
-        console.warn("Background Supabase auto-sync failed:", e);
+        console.warn("Background auto-sync failed:", e);
       });
     }
   } catch (err) {
-    console.error("Failed to save ERP local state:", err);
+    console.error("Failed to save local state:", err);
   }
 }
 
@@ -63,38 +76,34 @@ export async function testSupabaseConnection(url, anonKey) {
   try {
     if (!url || !anonKey) throw new Error("URL and Anon Key are required");
     const supabase = createClient(url, anonKey);
-    // Quick probe query
-    const { data, error } = await supabase.from('asr_erp_snapshots').select('id').limit(1);
-    if (error && error.code !== 'PGRST116' && error.code !== '42P01') {
-      // 42P01 is table does not exist, which is fine, means auth succeeded
-      throw error;
-    }
-    return { success: true, message: "Connected to Supabase successfully!" };
+    const { data, error } = await supabase.from('asr_erp_state').select('id').limit(1);
+    if (error) throw error;
+    return { success: true, message: "Connected to Supabase PostgreSQL successfully!" };
   } catch (err) {
     return { success: false, error: err.message || "Failed to reach Supabase" };
   }
 }
 
 export async function pushToSupabase(data, url, anonKey) {
-  const supabase = createClient(url, anonKey);
+  const supabase = createClient(url || DEFAULT_SUPABASE_URL, anonKey || DEFAULT_SUPABASE_KEY);
   const payload = {
-    app_version: "1.0.0",
-    last_updated: new Date().toISOString(),
-    state: data
+    id: 'primary_mill_snapshot',
+    state: data,
+    updated_at: new Date().toISOString()
   };
   
   const { error } = await supabase
-    .from('asr_erp_snapshots')
-    .upsert({ id: 'primary_mill_snapshot', ...payload });
+    .from('asr_erp_state')
+    .upsert(payload, { onConflict: 'id' });
     
   if (error) throw error;
   return { success: true };
 }
 
 export async function pullFromSupabase(url, anonKey) {
-  const supabase = createClient(url, anonKey);
+  const supabase = createClient(url || DEFAULT_SUPABASE_URL, anonKey || DEFAULT_SUPABASE_KEY);
   const { data, error } = await supabase
-    .from('asr_erp_snapshots')
+    .from('asr_erp_state')
     .select('state')
     .eq('id', 'primary_mill_snapshot')
     .single();
